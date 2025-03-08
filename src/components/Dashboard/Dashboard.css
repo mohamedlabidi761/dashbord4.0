@@ -1,0 +1,321 @@
+.dashboard-container {
+  padding: 20px;
+  background-color: var(--white);
+  min-height: 100vh;
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.dashboard-container h1 {
+  margin-bottom: 2rem;
+}
+
+.dashboard-container h2 {
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-card {
+  height: 100%;
+  border: none;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  transition: var(--transition);
+  overflow: hidden;
+}
+
+.dashboard-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-5px);
+}
+
+.dashboard-card-header {
+  background-color: rgba(0, 0, 0, 0.03);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  padding: 15px 20px;
+}
+
+.dashboard-card-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--secondary-color);
+}
+
+.dashboard-card-body {
+  padding: 20px;
+}
+
+.dashboard-stat {
+  text-align: center;
+  padding: 20px;
+  border-radius: var(--border-radius);
+  background: linear-gradient(135deg, var(--white) 0%, var(--light-color) 100%);
+  box-shadow: var(--shadow);
+  transition: var(--transition);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.dashboard-stat:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-lg);
+}
+
+.dashboard-stat-icon {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 2rem;
+  opacity: 0.2;
+  color: var(--secondary-color);
+}
+
+.dashboard-stat-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--secondary-color);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.dashboard-stat-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.dashboard-stat-progress {
+  height: 8px;
+  margin-top: 10px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.dashboard-stat.temperature {
+  background: linear-gradient(135deg, #e0f7fa 0%, #80deea 100%);
+}
+
+.dashboard-stat.temperature .dashboard-stat-value {
+  color: #00acc1;
+}
+
+.dashboard-stat.humidity {
+  background: linear-gradient(135deg, #e8f5e9 0%, #a5d6a7 100%);
+}
+
+.dashboard-stat.humidity .dashboard-stat-value {
+  color: #43a047;
+}
+
+.dashboard-stat.vibration {
+  background: linear-gradient(135deg, #fff8e1 0%, #ffe082 100%);
+}
+
+.dashboard-stat.vibration .dashboard-stat-value {
+  color: #ffb300;
+}
+
+.dashboard-stat.light {
+  background: linear-gradient(135deg, #e3f2fd 0%, #90caf9 100%);
+}
+
+.dashboard-stat.light .dashboard-stat-value {
+  color: #1e88e5;
+}
+
+.dashboard-stat.warning {
+  background: linear-gradient(135deg, #fff3e0 0%, #ffcc80 100%);
+}
+
+.dashboard-stat.warning .dashboard-stat-value {
+  color: #ef6c00;
+  animation: pulse 2s infinite;
+}
+
+.dashboard-stat.danger {
+  background: linear-gradient(135deg, #ffebee 0%, #ef9a9a 100%);
+}
+
+.dashboard-stat.danger .dashboard-stat-value {
+  color: #d32f2f;
+  animation: pulse 1s infinite;
+}
+
+.chart-container {
+  position: relative;
+  margin: 0 auto;
+  height: 300px;
+}
+
+.machine-status-container {
+  height: 100%;
+}
+
+.machine-status-item {
+  padding: 15px;
+  margin-bottom: 15px;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  transition: var(--transition);
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.machine-status-item:last-child {
+  margin-bottom: 0;
+}
+
+.machine-status-item:hover {
+  transform: translateX(5px);
+  box-shadow: var(--shadow-lg);
+}
+
+.machine-status-indicator {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  margin-top: 5px;
+}
+
+.machine-status-indicator.normal {
+  background-color: var(--success-color);
+  box-shadow: 0 0 10px var(--success-color);
+}
+
+.machine-status-indicator.warning {
+  background-color: var(--warning-color);
+  box-shadow: 0 0 10px var(--warning-color);
+  animation: pulse 2s infinite;
+}
+
+.machine-status-indicator.critical {
+  background-color: var(--danger-color);
+  box-shadow: 0 0 10px var(--danger-color);
+  animation: pulse 1s infinite;
+}
+
+.machine-status-info {
+  flex: 1;
+}
+
+.machine-status-name {
+  font-weight: 600;
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.machine-status-message {
+  color: var(--gray-color);
+  font-size: 0.9rem;
+  margin: 5px 0 0;
+}
+
+/* Animations */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.pulse {
+  animation: pulse 2s infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Dark mode styles */
+.dark-mode .dashboard-stat {
+  background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
+}
+
+.dark-mode .dashboard-stat-title {
+  color: var(--light-color);
+}
+
+.dark-mode .dashboard-stat-icon {
+  color: var(--light-color);
+}
+
+.dark-mode .dashboard-stat.temperature {
+  background: linear-gradient(135deg, #006064 0%, #00363a 100%);
+}
+
+.dark-mode .dashboard-stat.humidity {
+  background: linear-gradient(135deg, #1b5e20 0%, #0d3311 100%);
+}
+
+.dark-mode .dashboard-stat.vibration {
+  background: linear-gradient(135deg, #ff6f00 0%, #a04500 100%);
+}
+
+.dark-mode .dashboard-stat.light {
+  background: linear-gradient(135deg, #0d47a1 0%, #072a60 100%);
+}
+
+.dark-mode .dashboard-stat.warning {
+  background: linear-gradient(135deg, #e65100 0%, #bf360c 100%);
+}
+
+.dark-mode .dashboard-stat.danger {
+  background: linear-gradient(135deg, #b71c1c 0%, #7f0000 100%);
+}
+
+.dark-mode .machine-status-message {
+  color: #b0bec5;
+}
+
+.dark-mode .dashboard-card-header {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .dashboard-stat-value {
+    font-size: 2rem;
+  }
+  
+  .chart-container {
+    height: 250px;
+  }
+  
+  .machine-status-item {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 576px) {
+  .dashboard-stat-value {
+    font-size: 1.8rem;
+  }
+  
+  .chart-container {
+    height: 200px;
+  }
+} 
