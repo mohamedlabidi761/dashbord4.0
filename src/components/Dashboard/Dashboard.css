@@ -318,4 +318,48 @@
   .chart-container {
     height: 200px;
   }
+}
+
+/* Product Statistics Styles */
+.product-stat {
+  padding: 15px;
+  border-radius: 8px;
+  background-color: var(--card-bg);
+  transition: all 0.3s ease;
+}
+
+.product-stat:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.product-stat-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.product-stat-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.product-stat-label {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 5px;
+}
+
+/* Dark mode adjustments */
+.dark-mode .product-stat {
+  background-color: var(--dark-card-bg);
+}
+
+.dark-mode .product-stat:hover {
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 } 

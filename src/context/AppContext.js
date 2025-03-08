@@ -55,6 +55,13 @@ const initialMachines = [
   }
 ];
 
+// Sample product data
+const initialProductData = {
+  totalProducts: 1250,
+  conformingProducts: 1125,
+  nonConformingProducts: 125
+};
+
 // Sample alerts data
 const initialAlerts = [
   { 
@@ -172,6 +179,7 @@ export const AppProvider = ({ children }) => {
   const [alerts, setAlerts] = useState(initialAlerts);
   const [history, setHistory] = useState(initialHistory);
   const [productionData, setProductionData] = useState(generateProductionData());
+  const [productData, setProductData] = useState(initialProductData);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [user, setUser] = useState(null);
@@ -231,6 +239,23 @@ export const AppProvider = ({ children }) => {
   // Refresh production data
   const refreshProductionData = () => {
     setProductionData(generateProductionData());
+    
+    // Also update product data with some random variation
+    setProductData(prevData => {
+      const totalChange = Math.floor(Math.random() * 20) - 5; // -5 to +15
+      const newTotal = prevData.totalProducts + totalChange;
+      
+      // Calculate new conforming/non-conforming with slight random variation in ratio
+      const conformingRatio = Math.min(0.95, Math.max(0.85, (prevData.conformingProducts / prevData.totalProducts) + (Math.random() * 0.02 - 0.01)));
+      const newConforming = Math.floor(newTotal * conformingRatio);
+      const newNonConforming = newTotal - newConforming;
+      
+      return {
+        totalProducts: newTotal,
+        conformingProducts: newConforming,
+        nonConformingProducts: newNonConforming
+      };
+    });
   };
   
   // Simulate real-time updates
@@ -352,6 +377,7 @@ export const AppProvider = ({ children }) => {
       setHistory,
       productionData,
       refreshProductionData,
+      productData,
       isLoading,
       error,
       user,

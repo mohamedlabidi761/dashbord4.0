@@ -9,7 +9,9 @@ import {
   BsBrightnessHigh,
   BsArrowUp,
   BsArrowDown,
-  BsArrowRepeat
+  BsArrowRepeat,
+  BsCheckCircle,
+  BsXCircle
 } from 'react-icons/bs';
 import { useAppContext } from '../../context/AppContext';
 import './Dashboard.css';
@@ -22,7 +24,8 @@ const Dashboard = () => {
     refreshProductionData, 
     timeAgo,
     isLoading,
-    toggleMachineStatus
+    toggleMachineStatus,
+    productData
   } = useAppContext();
   
   const [averageTemp, setAverageTemp] = useState(0);
@@ -166,6 +169,62 @@ const Dashboard = () => {
               className="dashboard-stat-progress" 
             />
           </div>
+        </Col>
+      </Row>
+
+      {/* New Product Data Section */}
+      <Row className="g-4 mb-4">
+        <Col md={12}>
+          <Card className="dashboard-card">
+            <Card.Header className="dashboard-card-header">
+              <h2 className="dashboard-card-title">Production de Produits</h2>
+            </Card.Header>
+            <Card.Body className="dashboard-card-body">
+              <Row>
+                <Col md={4} className="text-center">
+                  <div className="product-stat">
+                    <h3 className="product-stat-title">Quantité Totale</h3>
+                    <div className="product-stat-value">{productData.totalProducts}</div>
+                    <div className="product-stat-label">produits</div>
+                  </div>
+                </Col>
+                <Col md={4} className="text-center">
+                  <div className="product-stat">
+                    <h3 className="product-stat-title">Produits Conformes</h3>
+                    <div className="product-stat-value text-success">
+                      {((productData.conformingProducts / productData.totalProducts) * 100).toFixed(1)}%
+                    </div>
+                    <div className="product-stat-label">
+                      <BsCheckCircle className="text-success me-1" />
+                      {productData.conformingProducts} produits
+                    </div>
+                    <ProgressBar 
+                      now={(productData.conformingProducts / productData.totalProducts) * 100} 
+                      variant="success" 
+                      className="mt-2" 
+                    />
+                  </div>
+                </Col>
+                <Col md={4} className="text-center">
+                  <div className="product-stat">
+                    <h3 className="product-stat-title">Produits Non Conformes</h3>
+                    <div className="product-stat-value text-danger">
+                      {((productData.nonConformingProducts / productData.totalProducts) * 100).toFixed(1)}%
+                    </div>
+                    <div className="product-stat-label">
+                      <BsXCircle className="text-danger me-1" />
+                      {productData.nonConformingProducts} produits
+                    </div>
+                    <ProgressBar 
+                      now={(productData.nonConformingProducts / productData.totalProducts) * 100} 
+                      variant="danger" 
+                      className="mt-2" 
+                    />
+                  </div>
+                </Col>
+              </Row>
+            </Card.Body>
+          </Card>
         </Col>
       </Row>
 
