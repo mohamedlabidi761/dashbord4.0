@@ -1,22 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Badge, Container, Row, Col, Card, InputGroup, FormControl, Tabs, Tab } from 'react-bootstrap';
+import { Table, Button, Modal, Form, Badge, Container, Row, Col, Card, InputGroup, FormControl, Tabs, Tab, Alert } from 'react-bootstrap';
 import { FaEdit, FaTrashAlt, FaSync, FaUser, FaFileExport, FaPlus, FaSearch, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
+import { machineService, workerService } from '../../utils/api';
+import LoadingSpinner from '../common/LoadingSpinner';
+import ErrorMessage from '../common/ErrorMessage';
 import './AdminManagement.css';
 
 const AdminManagement = () => {
-  // State for machines
-  const [machines, setMachines] = useState([
-    { id: 1, name: 'Machine CNC-01', type: 'CNC', status: 'operational', assignedWorker: 'Jean Dupont' },
-    { id: 2, name: 'Fraiseuse F-200', type: 'Fraiseuse', status: 'maintenance', assignedWorker: 'Marie Lambert' },
-    { id: 3, name: 'Tour T-100', type: 'Tour', status: 'offline', assignedWorker: 'Pierre Martin' }
-  ]);
-
-  // State for workers
-  const [workers, setWorkers] = useState([
-    { id: 1, name: 'Jean Dupont', specialty: 'Opérateur CNC', assignedMachines: ['Machine CNC-01'] },
-    { id: 2, name: 'Marie Lambert', specialty: 'Technicienne', assignedMachines: ['Fraiseuse F-200'] },
-    { id: 3, name: 'Pierre Martin', specialty: 'Mécanicien', assignedMachines: ['Tour T-100'] }
-  ]);
+  // State for machines and workers
+  const [machines, setMachines] = useState([]);
+  const [workers, setWorkers] = useState([]);
+  
+  // State for loading and errors
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // State for modals
   const [showMachineModal, setShowMachineModal] = useState(false);
@@ -34,7 +31,7 @@ const AdminManagement = () => {
   const [workerFormData, setWorkerFormData] = useState({ name: '', specialty: '', assignedMachines: [] });
 
   // State for sorting and filtering
-  const [workerSort, setWorkerSort] = useState({ field: 'id', direction: 'asc' });
+  const [workerSort, setWorkerSort] = useState({ field: '_id', direction: 'asc' });
   const [workerFilter, setWorkerFilter] = useState('');
   const [timestamp, setTimestamp] = useState(new Date());
 
@@ -42,13 +39,48 @@ const AdminManagement = () => {
   const [showDeleteWorkerModal, setShowDeleteWorkerModal] = useState(false);
   const [workerToDelete, setWorkerToDelete] = useState(null);
 
-  // Update timestamp every minute
+  // Fetch machines and workers on component mount
   useEffect(() => {
+    fetchMachines();
+    fetchWorkers();
+    
+    // Update timestamp every minute
     const interval = setInterval(() => {
       setTimestamp(new Date());
     }, 60000);
+    
     return () => clearInterval(interval);
   }, []);
+
+  // Fetch machines from API
+  const fetchMachines = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await machineService.getAllMachines();
+      setMachines(data);
+    } catch (err) {
+      setError('Failed to fetch machines. Please try again later.');
+      console.error('Error fetching machines:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fetch workers from API
+  const fetchWorkers = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await workerService.getAllWorkers();
+      setWorkers(data);
+    } catch (err) {
+      setError('Failed to fetch workers. Please try again later.');
+      console.error('Error fetching workers:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Format timestamp to French locale
   const formattedTimestamp = timestamp.toLocaleString('fr-FR', {
@@ -74,56 +106,97 @@ const AdminManagement = () => {
   };
 
   // Handle machine form submission
-  const handleMachineSubmit = (e) => {
+  const handleMachineSubmit = async (e) => {
     e.preventDefault();
-    if (selectedMachine) {
-      // Update existing machine
-      setMachines(machines.map(machine => 
-        machine.id === selectedMachine.id ? { ...machine, ...machineFormData } : machine
-      ));
-    } else {
-      // Add new machine
-      setMachines([...machines, {
-        id: Date.now(),
-        ...machineFormData
-      }]);
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      if (selectedMachine) {
+        // Update existing machine
+        await machineService.updateMachine(selectedMachine._id, machineFormData);
+      } else {
+        // Add new machine
+        await machineService.createMachine(machineFormData);
+      }
+      
+      // Refresh machines list
+      await fetchMachines();
+      
+      // Close modal and reset form
+      setShowMachineModal(false);
+      setSelectedMachine(null);
+      setMachineFormData({ name: '', type: '', status: 'operational', assignedWorker: '' });
+    } catch (err) {
+      setError('Failed to save machine. Please try again.');
+      console.error('Error saving machine:', err);
+    } finally {
+      setIsLoading(false);
     }
-    setShowMachineModal(false);
-    setSelectedMachine(null);
-    setMachineFormData({ name: '', type: '', status: 'operational', assignedWorker: '' });
   };
 
   // Handle worker form submission
-  const handleWorkerSubmit = (e) => {
+  const handleWorkerSubmit = async (e) => {
     e.preventDefault();
-    if (selectedWorker) {
-      // Update existing worker
-      setWorkers(workers.map(worker => 
-        worker.id === selectedWorker.id ? { ...worker, ...workerFormData } : worker
-      ));
-    } else {
-      // Add new worker
-      setWorkers([...workers, {
-        id: Date.now(),
-        ...workerFormData,
-        assignedMachines: workerFormData.assignedMachines || []
-      }]);
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      if (selectedWorker) {
+        // Update existing worker
+        await workerService.updateWorker(selectedWorker._id, workerFormData);
+      } else {
+        // Add new worker
+        await workerService.createWorker(workerFormData);
+      }
+      
+      // Refresh workers list
+      await fetchWorkers();
+      
+      // Close modal and reset form
+      setShowWorkerModal(false);
+      setSelectedWorker(null);
+      setWorkerFormData({ name: '', specialty: '', assignedMachines: [] });
+    } catch (err) {
+      setError('Failed to save worker. Please try again.');
+      console.error('Error saving worker:', err);
+    } finally {
+      setIsLoading(false);
     }
-    setShowWorkerModal(false);
-    setSelectedWorker(null);
-    setWorkerFormData({ name: '', specialty: '', assignedMachines: [] });
   };
 
   // Handle machine deletion
-  const handleDeleteMachine = (id) => {
-    setMachines(machines.filter(machine => machine.id !== id));
+  const handleDeleteMachine = async (id) => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      await machineService.deleteMachine(id);
+      await fetchMachines();
+    } catch (err) {
+      setError('Failed to delete machine. Please try again.');
+      console.error('Error deleting machine:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle worker deletion
-  const handleDeleteWorker = (id) => {
-    setWorkers(workers.filter(worker => worker.id !== id));
-    setShowDeleteWorkerModal(false);
-    setWorkerToDelete(null);
+  const handleDeleteWorker = async (id) => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      await workerService.deleteWorker(id);
+      await fetchWorkers();
+      setShowDeleteWorkerModal(false);
+      setWorkerToDelete(null);
+    } catch (err) {
+      setError('Failed to delete worker. Please try again.');
+      console.error('Error deleting worker:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle machine edit
@@ -144,7 +217,7 @@ const AdminManagement = () => {
     setWorkerFormData({ 
       name: worker.name, 
       specialty: worker.specialty, 
-      assignedMachines: worker.assignedMachines 
+      assignedMachines: worker.assignedMachines || [] 
     });
     setShowWorkerModal(true);
   };
@@ -215,6 +288,25 @@ const AdminManagement = () => {
     setShowDeleteWorkerModal(true);
   };
 
+  // Handle saving reassigned worker
+  const handleSaveReassignment = async () => {
+    if (!selectedWorker) return;
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      await workerService.updateWorker(selectedWorker._id, selectedWorker);
+      await fetchWorkers();
+      setShowReassignModal(false);
+    } catch (err) {
+      setError('Failed to reassign worker. Please try again.');
+      console.error('Error reassigning worker:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="admin-management-container">
       <Container fluid>
@@ -224,6 +316,9 @@ const AdminManagement = () => {
             <div className="timestamp">Dernière mise à jour: {formattedTimestamp}</div>
           </Col>
         </Row>
+
+        {/* Display error message if there is one */}
+        {error && <ErrorMessage message={error} onDismiss={() => setError(null)} />}
 
         <Tabs defaultActiveKey="machines" id="admin-tabs" className="mb-4">
           <Tab eventKey="machines" title="Machines">
@@ -239,8 +334,9 @@ const AdminManagement = () => {
                 </Button>
               </Card.Header>
               <Card.Body>
+                {isLoading && <LoadingSpinner text="Chargement des machines..." />}
                 <div className="table-responsive">
-                  {machines.length > 0 ? (
+                  {!isLoading && machines.length > 0 ? (
                     <Table striped hover className="machines-table">
                       <thead>
                         <tr>
@@ -254,8 +350,8 @@ const AdminManagement = () => {
                       </thead>
                       <tbody>
                         {machines.map(machine => (
-                          <tr key={machine.id}>
-                            <td>{machine.id}</td>
+                          <tr key={machine._id}>
+                            <td>{machine._id.substring(0, 8)}</td>
                             <td>{machine.name}</td>
                             <td>{machine.type}</td>
                             <td>{renderStatusBadge(machine.status)}</td>
@@ -264,7 +360,7 @@ const AdminManagement = () => {
                               <Button variant="outline-primary" size="sm" className="action-btn" onClick={() => handleEditMachine(machine)}>
                                 <FaEdit /> 
                               </Button>
-                              <Button variant="outline-danger" size="sm" className="action-btn" onClick={() => handleDeleteMachine(machine.id)}>
+                              <Button variant="outline-danger" size="sm" className="action-btn" onClick={() => handleDeleteMachine(machine._id)}>
                                 <FaTrashAlt />
                               </Button>
                             </td>
@@ -272,7 +368,7 @@ const AdminManagement = () => {
                         ))}
                       </tbody>
                     </Table>
-                  ) : (
+                  ) : !isLoading && (
                     <div className="empty-state">
                       <p>Aucune machine n'a été ajoutée. Cliquez sur "Ajouter une Machine" pour commencer.</p>
                     </div>
@@ -312,13 +408,14 @@ const AdminManagement = () => {
                     </InputGroup>
                   </Col>
                 </Row>
+                {isLoading && <LoadingSpinner text="Chargement des ouvriers..." />}
                 <div className="table-responsive">
-                  {filteredWorkers.length > 0 ? (
+                  {!isLoading && filteredWorkers.length > 0 ? (
                     <Table striped hover className="workers-table">
                       <thead>
                         <tr>
-                          <th onClick={() => toggleSort('id')} className="sortable-header">
-                            ID {renderSortIcon('id')}
+                          <th onClick={() => toggleSort('_id')} className="sortable-header">
+                            ID {renderSortIcon('_id')}
                           </th>
                           <th onClick={() => toggleSort('name')} className="sortable-header">
                             Nom {renderSortIcon('name')}
@@ -332,8 +429,8 @@ const AdminManagement = () => {
                       </thead>
                       <tbody>
                         {filteredWorkers.map(worker => (
-                          <tr key={worker.id}>
-                            <td>{worker.id}</td>
+                          <tr key={worker._id}>
+                            <td>{worker._id.substring(0, 8)}</td>
                             <td>{worker.name}</td>
                             <td>{worker.specialty}</td>
                             <td>
@@ -361,7 +458,7 @@ const AdminManagement = () => {
                         ))}
                       </tbody>
                     </Table>
-                  ) : (
+                  ) : !isLoading && (
                     <div className="empty-state">
                       <p>Aucun ouvrier trouvé avec les critères de recherche actuels.</p>
                     </div>
@@ -379,6 +476,7 @@ const AdminManagement = () => {
           <Modal.Title>{selectedMachine ? 'Modifier la Machine' : 'Ajouter une Machine'}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
+          {error && <ErrorMessage message={error} onDismiss={() => setError(null)} />}
           <Form onSubmit={handleMachineSubmit}>
             <Row>
               <Col md={6}>
@@ -428,7 +526,7 @@ const AdminManagement = () => {
                   >
                     <option value="">-- Aucun ouvrier assigné --</option>
                     {workers.map(worker => (
-                      <option key={worker.id} value={worker.name}>{worker.name}</option>
+                      <option key={worker._id} value={worker.name}>{worker.name}</option>
                     ))}
                   </Form.Select>
                 </Form.Group>
@@ -438,8 +536,8 @@ const AdminManagement = () => {
               <Button variant="secondary" onClick={() => setShowMachineModal(false)} className="me-2">
                 Annuler
               </Button>
-              <Button variant="success" type="submit">
-                {selectedMachine ? 'Mettre à jour' : 'Ajouter'}
+              <Button variant="success" type="submit" disabled={isLoading}>
+                {isLoading ? 'Chargement...' : selectedMachine ? 'Mettre à jour' : 'Ajouter'}
               </Button>
             </div>
           </Form>
@@ -452,6 +550,7 @@ const AdminManagement = () => {
           <Modal.Title>{selectedWorker ? 'Modifier l\'Ouvrier' : 'Ajouter un Ouvrier'}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
+          {error && <ErrorMessage message={error} onDismiss={() => setError(null)} />}
           <Form onSubmit={handleWorkerSubmit}>
             <Row>
               <Col md={6}>
@@ -482,9 +581,9 @@ const AdminManagement = () => {
               <div className="machine-checkboxes">
                 {machines.map(machine => (
                   <Form.Check
-                    key={machine.id}
+                    key={machine._id}
                     type="checkbox"
-                    id={`machine-${machine.id}`}
+                    id={`machine-${machine._id}`}
                     label={machine.name}
                     checked={workerFormData.assignedMachines?.includes(machine.name) || false}
                     onChange={(e) => {
@@ -501,8 +600,8 @@ const AdminManagement = () => {
               <Button variant="secondary" onClick={() => setShowWorkerModal(false)} className="me-2">
                 Annuler
               </Button>
-              <Button variant="primary" type="submit">
-                {selectedWorker ? 'Mettre à jour' : 'Ajouter'}
+              <Button variant="primary" type="submit" disabled={isLoading}>
+                {isLoading ? 'Chargement...' : selectedWorker ? 'Mettre à jour' : 'Ajouter'}
               </Button>
             </div>
           </Form>
@@ -557,9 +656,9 @@ const AdminManagement = () => {
               <div className="machine-checkboxes">
                 {machines.map(machine => (
                   <Form.Check
-                    key={machine.id}
+                    key={machine._id}
                     type="checkbox"
-                    id={`reassign-machine-${machine.id}`}
+                    id={`reassign-machine-${machine._id}`}
                     label={machine.name}
                     checked={selectedWorker?.assignedMachines?.includes(machine.name) || false}
                     onChange={(e) => {
@@ -583,15 +682,8 @@ const AdminManagement = () => {
           <Button variant="secondary" onClick={() => setShowReassignModal(false)}>
             Annuler
           </Button>
-          <Button variant="primary" onClick={() => {
-            if (selectedWorker) {
-              setWorkers(workers.map(worker => 
-                worker.id === selectedWorker.id ? selectedWorker : worker
-              ));
-              setShowReassignModal(false);
-            }
-          }}>
-            Enregistrer
+          <Button variant="primary" onClick={handleSaveReassignment} disabled={isLoading}>
+            {isLoading ? 'Chargement...' : 'Enregistrer'}
           </Button>
         </Modal.Footer>
       </Modal>
@@ -659,9 +751,10 @@ const AdminManagement = () => {
           </Button>
           <Button 
             variant="danger" 
-            onClick={() => workerToDelete && handleDeleteWorker(workerToDelete.id)}
+            onClick={() => workerToDelete && handleDeleteWorker(workerToDelete._id)}
+            disabled={isLoading}
           >
-            Supprimer
+            {isLoading ? 'Chargement...' : 'Supprimer'}
           </Button>
         </Modal.Footer>
       </Modal>
