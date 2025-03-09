@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, Modal, Form, Badge, Container, Row, Col, Card, InputGroup, FormControl, Tabs, Tab, Alert } from 'react-bootstrap';
 import { FaEdit, FaTrashAlt, FaSync, FaUser, FaFileExport, FaPlus, FaSearch, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
-import { machineService, workerService } from '../../utils/api';
+import { machineService, workerService, checkApiConnection } from '../../utils/api';
 import LoadingSpinner from '../common/LoadingSpinner';
 import ErrorMessage from '../common/ErrorMessage';
 import './AdminManagement.css';
@@ -14,6 +14,17 @@ const AdminManagement = () => {
   // State for loading and errors
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // State to track if we're in demo mode
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  
+  // Debug state to track worker operations
+  const [debugInfo, setDebugInfo] = useState({
+    lastOperation: null,
+    workerCount: 0,
+    lastAddedWorker: null,
+    apiResponse: null
+  });
 
   // State for modals
   const [showMachineModal, setShowMachineModal] = useState(false);
@@ -39,10 +50,37 @@ const AdminManagement = () => {
   const [showDeleteWorkerModal, setShowDeleteWorkerModal] = useState(false);
   const [workerToDelete, setWorkerToDelete] = useState(null);
 
+  // Add this with the other state variables
+  const [successMessage, setSuccessMessage] = useState('');
+
   // Fetch machines and workers on component mount
   useEffect(() => {
-    fetchMachines();
-    fetchWorkers();
+    const initializeComponent = async () => {
+      setIsLoading(true);
+      
+      // Check API connection first
+      const connectionStatus = await checkApiConnection();
+      
+      if (connectionStatus.connected) {
+        // API is available, fetch data
+        try {
+          await fetchMachines();
+          await fetchWorkers();
+        } catch (err) {
+          console.error("Error fetching initial data:", err);
+          setError('Erreur lors du chargement des données. Veuillez réessayer.');
+        }
+      } else {
+        // API is not available, activate demo mode
+        console.log("API not available, activating demo mode");
+        setError('Impossible de se connecter au serveur. Mode démo activé automatiquement.');
+        activateDemoMode();
+      }
+      
+      setIsLoading(false);
+    };
+    
+    initializeComponent();
     
     // Update timestamp every minute
     const interval = setInterval(() => {
@@ -52,31 +90,76 @@ const AdminManagement = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Activate demo mode
+  const activateDemoMode = () => {
+    setMachines([
+      { _id: '1', name: 'Machine CNC-01', type: 'CNC', status: 'operational', assignedWorker: 'Jean Dupont' },
+      { _id: '2', name: 'Fraiseuse F-200', type: 'Fraiseuse', status: 'maintenance', assignedWorker: 'Marie Lambert' },
+      { _id: '3', name: 'Tour T-100', type: 'Tour', status: 'offline', assignedWorker: 'Pierre Martin' }
+    ]);
+    setWorkers([
+      { _id: '1', name: 'Jean Dupont', specialty: 'Opérateur CNC', assignedMachines: ['Machine CNC-01'] },
+      { _id: '2', name: 'Marie Lambert', specialty: 'Technicienne', assignedMachines: ['Fraiseuse F-200'] },
+      { _id: '3', name: 'Pierre Martin', specialty: 'Mécanicien', assignedMachines: ['Tour T-100'] }
+    ]);
+    setIsDemoMode(true);
+    setError(null);
+  };
+
   // Fetch machines from API
   const fetchMachines = async () => {
+    if (isDemoMode) return; // Skip API call in demo mode
+    
     setIsLoading(true);
-    setError(null);
     try {
+      console.log("Fetching machines from API...");
       const data = await machineService.getAllMachines();
-      setMachines(data);
+      console.log("Fetched machines from API:", data);
+      
+      if (Array.isArray(data)) {
+        // Replace the entire machines state with the API data
+        // This ensures no duplicates and keeps the state in sync with the backend
+        setMachines(data);
+        console.log("Machines state updated from API:", data.length);
+      } else {
+        console.error("API did not return an array of machines:", data);
+      }
     } catch (err) {
-      setError('Failed to fetch machines. Please try again later.');
-      console.error('Error fetching machines:', err);
+      console.error("Error fetching machines:", err);
+      setError('Failed to fetch machines. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Fetch workers from API
+  useEffect(() => {
+    const initializeData = async () => {
+      await fetchWorkers();
+    };
+    initializeData();
+  }, []);
+
+  // Improve the fetchWorkers function to properly handle duplicates
   const fetchWorkers = async () => {
+    if (isDemoMode) return; // Skip API call in demo mode
+    
     setIsLoading(true);
-    setError(null);
     try {
+      console.log("Fetching workers from API...");
       const data = await workerService.getAllWorkers();
-      setWorkers(data);
+      console.log("Fetched workers from API:", data);
+      
+      if (Array.isArray(data)) {
+        // Replace the entire workers state with the API data
+        // This ensures no duplicates and keeps the state in sync with the backend
+        setWorkers(data);
+        console.log("Workers state updated from API:", data.length);
+      } else {
+        console.error("API did not return an array of workers:", data);
+      }
     } catch (err) {
-      setError('Failed to fetch workers. Please try again later.');
-      console.error('Error fetching workers:', err);
+      console.error("Error fetching workers:", err);
+      setError('Failed to fetch workers. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -105,60 +188,144 @@ const AdminManagement = () => {
     }
   };
 
-  // Handle machine form submission
+  // Improve the handleMachineSubmit function to add success messages
   const handleMachineSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setSuccessMessage(''); // Clear any existing success message
     
     try {
-      if (selectedMachine) {
-        // Update existing machine
-        await machineService.updateMachine(selectedMachine._id, machineFormData);
+      if (isDemoMode) {
+        // Handle in demo mode
+        if (selectedMachine) {
+          // Update existing machine
+          setMachines(machines.map(machine => 
+            machine._id === selectedMachine._id ? { ...machine, ...machineFormData } : machine
+          ));
+          setSuccessMessage(`Machine "${machineFormData.name}" modifiée avec succès`);
+        } else {
+          // Add new machine
+          const newMachine = {
+            _id: Date.now().toString(),
+            ...machineFormData
+          };
+          setMachines([...machines, newMachine]);
+          setSuccessMessage(`Machine "${newMachine.name}" ajoutée avec succès`);
+        }
       } else {
-        // Add new machine
-        await machineService.createMachine(machineFormData);
+        // Handle with API
+        if (selectedMachine) {
+          // Update existing machine
+          const updatedMachine = await machineService.updateMachine(selectedMachine._id, machineFormData);
+          
+          // Update the machine in the state
+          setMachines(prevMachines => 
+            prevMachines.map(machine => 
+              machine._id === selectedMachine._id ? { ...machine, ...updatedMachine } : machine
+            )
+          );
+          setSuccessMessage(`Machine "${machineFormData.name}" modifiée avec succès`);
+        } else {
+          // Add new machine
+          const newMachine = await machineService.createMachine(machineFormData);
+          
+          if (newMachine && newMachine._id) {
+            // Fetch the complete list from the server to ensure consistency
+            await fetchMachines();
+            setSuccessMessage(`Machine "${machineFormData.name}" ajoutée avec succès`);
+          } else {
+            console.error("No valid response from createMachine");
+            setError("Erreur: Aucune réponse valide du serveur lors de la création de la machine");
+          }
+        }
       }
-      
-      // Refresh machines list
-      await fetchMachines();
       
       // Close modal and reset form
       setShowMachineModal(false);
       setSelectedMachine(null);
       setMachineFormData({ name: '', type: '', status: 'operational', assignedWorker: '' });
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
-      setError('Failed to save machine. Please try again.');
+      setError(`Erreur lors de l'enregistrement: ${err.message || 'Erreur inconnue'}`);
       console.error('Error saving machine:', err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handle worker form submission
+  // Improve the handleWorkerSubmit function to add success messages
   const handleWorkerSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setSuccessMessage(''); // Clear any existing success message
     
     try {
-      if (selectedWorker) {
-        // Update existing worker
-        await workerService.updateWorker(selectedWorker._id, workerFormData);
+      if (isDemoMode) {
+        // Handle in demo mode
+        if (selectedWorker) {
+          // Update existing worker
+          setWorkers(workers.map(worker => 
+            worker._id === selectedWorker._id ? { ...worker, ...workerFormData } : worker
+          ));
+          setSuccessMessage(`Ouvrier "${workerFormData.name}" modifié avec succès`);
+        } else {
+          // Add new worker
+          const newWorker = {
+            _id: Date.now().toString(),
+            ...workerFormData,
+            assignedMachines: workerFormData.assignedMachines || []
+          };
+          
+          // Add the new worker to state
+          setWorkers(prevWorkers => [...prevWorkers, newWorker]);
+          console.log("Added new worker in demo mode:", newWorker);
+          setSuccessMessage(`Ouvrier "${newWorker.name}" ajouté avec succès`);
+        }
       } else {
-        // Add new worker
-        await workerService.createWorker(workerFormData);
+        // Handle with API
+        if (selectedWorker) {
+          // Update existing worker
+          const updatedWorker = await workerService.updateWorker(selectedWorker._id, workerFormData);
+          console.log("Worker updated:", updatedWorker);
+          
+          // Update the worker in the state
+          setWorkers(prevWorkers => 
+            prevWorkers.map(worker => 
+              worker._id === selectedWorker._id ? { ...worker, ...updatedWorker } : worker
+            )
+          );
+          setSuccessMessage(`Ouvrier "${workerFormData.name}" modifié avec succès`);
+        } else {
+          // Add new worker
+          console.log("Submitting new worker:", workerFormData);
+          const newWorker = await workerService.createWorker(workerFormData);
+          console.log("Worker created:", newWorker);
+          
+          if (newWorker && newWorker._id) {
+            // Fetch the complete list from the server to ensure consistency
+            // This is more reliable than manually adding to state
+            await fetchWorkers();
+            setSuccessMessage(`Ouvrier "${workerFormData.name}" ajouté avec succès`);
+          } else {
+            console.error("No valid response from createWorker");
+            setError("Erreur: Aucune réponse valide du serveur lors de la création de l'ouvrier");
+          }
+        }
       }
-      
-      // Refresh workers list
-      await fetchWorkers();
       
       // Close modal and reset form
       setShowWorkerModal(false);
       setSelectedWorker(null);
       setWorkerFormData({ name: '', specialty: '', assignedMachines: [] });
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
-      setError('Failed to save worker. Please try again.');
+      setError(`Erreur lors de l'enregistrement: ${err.message || 'Erreur inconnue'}`);
       console.error('Error saving worker:', err);
     } finally {
       setIsLoading(false);
@@ -171,8 +338,14 @@ const AdminManagement = () => {
     setError(null);
     
     try {
-      await machineService.deleteMachine(id);
-      await fetchMachines();
+      if (isDemoMode) {
+        // Handle in demo mode
+        setMachines(machines.filter(machine => machine._id !== id));
+      } else {
+        // Handle with API
+        await machineService.deleteMachine(id);
+        await fetchMachines();
+      }
     } catch (err) {
       setError('Failed to delete machine. Please try again.');
       console.error('Error deleting machine:', err);
@@ -183,16 +356,49 @@ const AdminManagement = () => {
 
   // Handle worker deletion
   const handleDeleteWorker = async (id) => {
+    if (!id) {
+      console.error("No worker ID provided for deletion");
+      setError("Erreur: Aucun identifiant d'ouvrier fourni pour la suppression");
+      return;
+    }
+    
     setIsLoading(true);
     setError(null);
     
     try {
-      await workerService.deleteWorker(id);
-      await fetchWorkers();
+      console.log(`Attempting to delete worker with ID: ${id}`);
+      
+      if (isDemoMode) {
+        // Handle in demo mode
+        const workerToRemove = workers.find(w => w._id === id);
+        if (workerToRemove) {
+          console.log(`Removing worker from state: ${workerToRemove.name}`);
+          setWorkers(prevWorkers => prevWorkers.filter(worker => worker._id !== id));
+        } else {
+          console.warn(`Worker with ID ${id} not found in state`);
+        }
+      } else {
+        // Handle with API
+        const response = await workerService.deleteWorker(id);
+        console.log("Delete worker API response:", response);
+        
+        // Immediately update the local state to provide instant feedback
+        setWorkers(prevWorkers => prevWorkers.filter(worker => worker._id !== id));
+        
+        // Then refresh from server to ensure consistency
+        await fetchWorkers();
+      }
+      
+      // Close modal and reset state
       setShowDeleteWorkerModal(false);
       setWorkerToDelete(null);
+      
+      // Show success message
+      setSuccessMessage("Ouvrier supprimé avec succès");
+      setTimeout(() => setSuccessMessage(""), 3000); // Clear after 3 seconds
     } catch (err) {
-      setError('Failed to delete worker. Please try again.');
+      const errorMsg = err.message || 'Erreur inconnue';
+      setError(`Erreur lors de la suppression: ${errorMsg}`);
       console.error('Error deleting worker:', err);
     } finally {
       setIsLoading(false);
@@ -242,7 +448,12 @@ const AdminManagement = () => {
   };
 
   // Sort workers
-  const sortedWorkers = [...workers].sort((a, b) => {
+  const sortedWorkers = [...(Array.isArray(workers) ? workers : [])].sort((a, b) => {
+    // Make sure we have valid objects with the required field
+    if (!a || !b || !a[workerSort.field] || !b[workerSort.field]) {
+      return 0;
+    }
+    
     const aValue = a[workerSort.field];
     const bValue = b[workerSort.field];
     
@@ -253,10 +464,10 @@ const AdminManagement = () => {
     }
   });
 
-  // Filter workers
+  // Filter workers - Make sure we're filtering the correct data
   const filteredWorkers = sortedWorkers.filter(worker => 
-    worker.name.toLowerCase().includes(workerFilter.toLowerCase()) ||
-    worker.specialty.toLowerCase().includes(workerFilter.toLowerCase())
+    worker.name?.toLowerCase().includes(workerFilter.toLowerCase()) ||
+    worker.specialty?.toLowerCase().includes(workerFilter.toLowerCase())
   );
 
   // Toggle sort direction
@@ -296,8 +507,16 @@ const AdminManagement = () => {
     setError(null);
     
     try {
-      await workerService.updateWorker(selectedWorker._id, selectedWorker);
-      await fetchWorkers();
+      if (isDemoMode) {
+        // Handle in demo mode
+        setWorkers(workers.map(worker => 
+          worker._id === selectedWorker._id ? selectedWorker : worker
+        ));
+      } else {
+        // Handle with API
+        await workerService.updateWorker(selectedWorker._id, selectedWorker);
+        await fetchWorkers();
+      }
       setShowReassignModal(false);
     } catch (err) {
       setError('Failed to reassign worker. Please try again.');
@@ -307,18 +526,132 @@ const AdminManagement = () => {
     }
   };
 
+  // Add a manual refresh button for workers
+  const handleRefreshWorkers = async () => {
+    try {
+      await fetchWorkers();
+    } catch (err) {
+      setError('Impossible de rafraîchir la liste des ouvriers.');
+    }
+  };
+
   return (
-    <div className="admin-management-container">
+    <div className={`admin-management-container ${isDemoMode ? 'demo-mode' : ''}`}>
       <Container fluid>
         <Row className="mb-4">
-          <Col>
-            <h1 className="page-title">Gestion Admin</h1>
+          <Col md={8}>
+            <h1 className="page-title">
+              Gestion Admin
+              {isDemoMode && <span className="demo-mode-badge">Mode Démo</span>}
+              {isLoading && <span className="loading-badge ms-2">Chargement...</span>}
+            </h1>
             <div className="timestamp">Dernière mise à jour: {formattedTimestamp}</div>
+            {successMessage && (
+              <div className="success-message alert alert-success mt-2">
+                {successMessage}
+              </div>
+            )}
+            {isDemoMode && (
+              <div className="demo-mode-alert">
+                Les données sont gérées localement et ne seront pas persistantes. 
+                Toutes les modifications seront perdues lors du rafraîchissement de la page.
+                <Button 
+                  variant="link" 
+                  size="sm" 
+                  className="ms-2"
+                  onClick={activateDemoMode}
+                >
+                  Réinitialiser les données
+                </Button>
+              </div>
+            )}
+          </Col>
+          <Col md={4} className="d-flex justify-content-end align-items-center">
+            <Button 
+              variant={isDemoMode ? "outline-warning" : "outline-primary"}
+              onClick={() => {
+                if (isDemoMode) {
+                  // Try to switch back to API mode
+                  setIsDemoMode(false);
+                  const fetchData = async () => {
+                    try {
+                      await fetchMachines();
+                      await fetchWorkers();
+                    } catch (err) {
+                      setError('Impossible de se connecter au serveur. Mode démo réactivé.');
+                      activateDemoMode();
+                    }
+                  };
+                  fetchData();
+                } else {
+                  // Switch to demo mode
+                  activateDemoMode();
+                }
+              }}
+              disabled={isLoading}
+            >
+              {isDemoMode ? "Essayer Mode API" : "Activer Mode Démo"}
+            </Button>
           </Col>
         </Row>
 
         {/* Display error message if there is one */}
-        {error && <ErrorMessage message={error} onDismiss={() => setError(null)} />}
+        {error && (
+          <div className="mb-4">
+            <ErrorMessage message={error} onDismiss={() => setError(null)} />
+            {error.includes('backend') && (
+              <Card className="mt-3">
+                <Card.Body>
+                  <Card.Title>Mode Démo</Card.Title>
+                  <Card.Text>
+                    Le backend n'est pas disponible. Vous pouvez utiliser le mode démo pour tester l'interface.
+                  </Card.Text>
+                  <Button 
+                    variant="primary" 
+                    onClick={activateDemoMode}
+                  >
+                    Activer le Mode Démo
+                  </Button>
+                </Card.Body>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* Debug information panel - only visible in development */}
+        {process.env.NODE_ENV === 'development' && (
+          <Card className="mb-4 debug-panel">
+            <Card.Header className="d-flex justify-content-between align-items-center">
+              <h5 className="mb-0">Informations de débogage</h5>
+              <Button 
+                variant="outline-secondary" 
+                size="sm"
+                onClick={() => console.log("Current workers state:", workers)}
+              >
+                Log Workers
+              </Button>
+            </Card.Header>
+            <Card.Body>
+              <Row>
+                <Col md={6}>
+                  <p><strong>Mode:</strong> {isDemoMode ? 'Démo' : 'API'}</p>
+                  <p><strong>Dernière opération:</strong> {debugInfo.lastOperation}</p>
+                  <p><strong>Nombre d'ouvriers:</strong> {workers.length}</p>
+                </Col>
+                <Col md={6}>
+                  {debugInfo.lastAddedWorker && (
+                    <div>
+                      <p><strong>Dernier ouvrier ajouté:</strong></p>
+                      <pre className="debug-json">
+                        {JSON.stringify(debugInfo.lastAddedWorker, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </Col>
+              </Row>
+            </Card.Body>
+          </Card>
+        )}
 
         <Tabs defaultActiveKey="machines" id="admin-tabs" className="mb-4">
           <Tab eventKey="machines" title="Machines">
@@ -383,6 +716,16 @@ const AdminManagement = () => {
               <Card.Header className="d-flex justify-content-between align-items-center">
                 <h2>Ouvriers</h2>
                 <div className="header-actions">
+                  {!isDemoMode && (
+                    <Button 
+                      variant="outline-info" 
+                      className="me-2" 
+                      onClick={handleRefreshWorkers}
+                      disabled={isLoading}
+                    >
+                      <FaSync className={isLoading ? "fa-spin" : ""} /> Rafraîchir
+                    </Button>
+                  )}
                   <Button variant="outline-secondary" className="export-btn me-2" onClick={() => setShowExportModal(true)}>
                     <FaFileExport /> Exporter en CSV
                   </Button>
@@ -407,6 +750,13 @@ const AdminManagement = () => {
                       />
                     </InputGroup>
                   </Col>
+                  {isDemoMode && (
+                    <Col md={6} className="text-end">
+                      <small className="text-muted">
+                        Nombre d'ouvriers: {workers.length}
+                      </small>
+                    </Col>
+                  )}
                 </Row>
                 {isLoading && <LoadingSpinner text="Chargement des ouvriers..." />}
                 <div className="table-responsive">
@@ -477,6 +827,11 @@ const AdminManagement = () => {
         </Modal.Header>
         <Modal.Body>
           {error && <ErrorMessage message={error} onDismiss={() => setError(null)} />}
+          {successMessage && (
+            <div className="alert alert-success mt-3" role="alert">
+              {successMessage}
+            </div>
+          )}
           <Form onSubmit={handleMachineSubmit}>
             <Row>
               <Col md={6}>
@@ -525,7 +880,7 @@ const AdminManagement = () => {
                     onChange={(e) => setMachineFormData({ ...machineFormData, assignedWorker: e.target.value })}
                   >
                     <option value="">-- Aucun ouvrier assigné --</option>
-                    {workers.map(worker => (
+                    {Array.isArray(workers) && workers.map(worker => (
                       <option key={worker._id} value={worker.name}>{worker.name}</option>
                     ))}
                   </Form.Select>
@@ -551,27 +906,39 @@ const AdminManagement = () => {
         </Modal.Header>
         <Modal.Body>
           {error && <ErrorMessage message={error} onDismiss={() => setError(null)} />}
-          <Form onSubmit={handleWorkerSubmit}>
+          {successMessage && (
+            <div className="alert alert-success mt-3" role="alert">
+              {successMessage}
+            </div>
+          )}
+          <Form onSubmit={handleWorkerSubmit} id="workerForm">
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Nom</Form.Label>
+                  <Form.Label>Nom <span className="text-danger">*</span></Form.Label>
                   <Form.Control
                     type="text"
                     value={workerFormData.name}
                     onChange={(e) => setWorkerFormData({ ...workerFormData, name: e.target.value })}
                     required
+                    minLength={2}
+                    maxLength={50}
                   />
+                  <Form.Text className="text-muted">
+                    Le nom doit comporter entre 2 et 50 caractères.
+                  </Form.Text>
                 </Form.Group>
               </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Spécialité</Form.Label>
+                  <Form.Label>Spécialité <span className="text-danger">*</span></Form.Label>
                   <Form.Control
                     type="text"
                     value={workerFormData.specialty}
                     onChange={(e) => setWorkerFormData({ ...workerFormData, specialty: e.target.value })}
                     required
+                    minLength={2}
+                    maxLength={50}
                   />
                 </Form.Group>
               </Col>
@@ -579,28 +946,39 @@ const AdminManagement = () => {
             <Form.Group className="mb-3">
               <Form.Label>Machines Assignées</Form.Label>
               <div className="machine-checkboxes">
-                {machines.map(machine => (
-                  <Form.Check
-                    key={machine._id}
-                    type="checkbox"
-                    id={`machine-${machine._id}`}
-                    label={machine.name}
-                    checked={workerFormData.assignedMachines?.includes(machine.name) || false}
-                    onChange={(e) => {
-                      const updatedMachines = e.target.checked
-                        ? [...(workerFormData.assignedMachines || []), machine.name]
-                        : (workerFormData.assignedMachines || []).filter(m => m !== machine.name);
-                      setWorkerFormData({ ...workerFormData, assignedMachines: updatedMachines });
-                    }}
-                  />
-                ))}
+                {Array.isArray(machines) && machines.length > 0 ? (
+                  machines.map(machine => (
+                    <Form.Check
+                      key={machine._id}
+                      type="checkbox"
+                      id={`machine-${machine._id}`}
+                      label={machine.name}
+                      checked={workerFormData.assignedMachines.includes(machine._id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setWorkerFormData({
+                            ...workerFormData,
+                            assignedMachines: [...workerFormData.assignedMachines, machine._id]
+                          });
+                        } else {
+                          setWorkerFormData({
+                            ...workerFormData,
+                            assignedMachines: workerFormData.assignedMachines.filter((id) => id !== machine._id)
+                          });
+                        }
+                      }}
+                    />
+                  ))
+                ) : (
+                  <p>Aucune machine disponible pour assigner.</p>
+                )}
               </div>
             </Form.Group>
             <div className="d-flex justify-content-end mt-3">
               <Button variant="secondary" onClick={() => setShowWorkerModal(false)} className="me-2">
                 Annuler
               </Button>
-              <Button variant="primary" type="submit" disabled={isLoading}>
+              <Button variant="success" type="submit" disabled={isLoading}>
                 {isLoading ? 'Chargement...' : selectedWorker ? 'Mettre à jour' : 'Ajouter'}
               </Button>
             </div>
@@ -608,153 +986,20 @@ const AdminManagement = () => {
         </Modal.Body>
       </Modal>
 
-      {/* Export Modal */}
-      <Modal show={showExportModal} onHide={() => setShowExportModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Exporter les Données</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <Form.Group className="mb-3">
-              <Form.Label>Format</Form.Label>
-              <Form.Select defaultValue="csv">
-                <option value="csv">CSV</option>
-                <option value="excel">Excel</option>
-                <option value="pdf">PDF</option>
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Colonnes à inclure</Form.Label>
-              <div>
-                <Form.Check type="checkbox" id="col-id" label="ID" defaultChecked />
-                <Form.Check type="checkbox" id="col-name" label="Nom" defaultChecked />
-                <Form.Check type="checkbox" id="col-specialty" label="Spécialité" defaultChecked />
-                <Form.Check type="checkbox" id="col-machines" label="Machines Assignées" defaultChecked />
-              </div>
-            </Form.Group>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowExportModal(false)}>
-            Annuler
-          </Button>
-          <Button variant="primary" onClick={handleExportCSV}>
-            Exporter
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Reassign Modal */}
-      <Modal show={showReassignModal} onHide={() => setShowReassignModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Réassigner {selectedWorker?.name}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <Form.Group className="mb-3">
-              <Form.Label>Machines Disponibles</Form.Label>
-              <div className="machine-checkboxes">
-                {machines.map(machine => (
-                  <Form.Check
-                    key={machine._id}
-                    type="checkbox"
-                    id={`reassign-machine-${machine._id}`}
-                    label={machine.name}
-                    checked={selectedWorker?.assignedMachines?.includes(machine.name) || false}
-                    onChange={(e) => {
-                      if (!selectedWorker) return;
-                      
-                      const updatedWorker = { ...selectedWorker };
-                      if (e.target.checked) {
-                        updatedWorker.assignedMachines = [...(updatedWorker.assignedMachines || []), machine.name];
-                      } else {
-                        updatedWorker.assignedMachines = (updatedWorker.assignedMachines || []).filter(m => m !== machine.name);
-                      }
-                      setSelectedWorker(updatedWorker);
-                    }}
-                  />
-                ))}
-              </div>
-            </Form.Group>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowReassignModal(false)}>
-            Annuler
-          </Button>
-          <Button variant="primary" onClick={handleSaveReassignment} disabled={isLoading}>
-            {isLoading ? 'Chargement...' : 'Enregistrer'}
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Profile Modal */}
-      <Modal show={showProfileModal} onHide={() => setShowProfileModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Profil de l'Ouvrier</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {selectedWorker && (
-            <div className="worker-profile">
-              <div className="profile-header">
-                <div className="profile-avatar">
-                  <FaUser size={48} />
-                </div>
-                <div className="profile-info">
-                  <h3>{selectedWorker.name}</h3>
-                  <p className="text-muted">{selectedWorker.specialty}</p>
-                </div>
-              </div>
-              <hr />
-              <h5>Machines Assignées</h5>
-              {selectedWorker.assignedMachines && selectedWorker.assignedMachines.length > 0 ? (
-                <ul className="assigned-machines-list">
-                  {selectedWorker.assignedMachines.map((machine, index) => (
-                    <li key={index}>{machine}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-muted">Aucune machine assignée</p>
-              )}
-            </div>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowProfileModal(false)}>
-            Fermer
-          </Button>
-          <Button variant="primary" onClick={() => {
-            setShowProfileModal(false);
-            handleEditWorker(selectedWorker);
-          }}>
-            Modifier
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
       {/* Delete Worker Confirmation Modal */}
       <Modal show={showDeleteWorkerModal} onHide={() => setShowDeleteWorkerModal(false)}>
         <Modal.Header closeButton>
-          <Modal.Title>Confirmer la suppression</Modal.Title>
+          <Modal.Title>Supprimer l'ouvrier</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {workerToDelete && (
-            <p>
-              Êtes-vous sûr de vouloir supprimer l'ouvrier <strong>{workerToDelete.name}</strong> ?
-              Cette action est irréversible.
-            </p>
-          )}
+          Êtes-vous sûr de vouloir supprimer cet ouvrier ? Cette action est irréversible.
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowDeleteWorkerModal(false)}>
             Annuler
           </Button>
-          <Button 
-            variant="danger" 
-            onClick={() => workerToDelete && handleDeleteWorker(workerToDelete._id)}
-            disabled={isLoading}
-          >
-            {isLoading ? 'Chargement...' : 'Supprimer'}
+          <Button variant="danger" onClick={() => handleDeleteWorker(workerToDelete._id)}>
+            Supprimer
           </Button>
         </Modal.Footer>
       </Modal>
@@ -762,4 +1007,4 @@ const AdminManagement = () => {
   );
 };
 
-export default AdminManagement; 
+export default AdminManagement;
